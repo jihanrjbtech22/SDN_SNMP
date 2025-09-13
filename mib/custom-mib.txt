@@ -1,0 +1,153 @@
+-- Custom SNMP MIB Definition
+-- SNMP Management Information Base for Full Stack SNMP Project
+
+CUSTOM-ENTERPRISE-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, Integer32, OctetString, TimeTicks
+        FROM SNMPv2-SMI
+    TEXTUAL-CONVENTION, DisplayString
+        FROM SNMPv2-TC;
+
+customEnterprise MODULE-IDENTITY
+    LAST-UPDATED "202412010000Z"
+    ORGANIZATION "SNMP Project Team"
+    CONTACT-INFO "admin@snmp-project.local"
+    DESCRIPTION
+        "Custom Enterprise MIB for SNMP Management System"
+    REVISION "202412010000Z"
+    DESCRIPTION
+        "Initial version of the custom MIB"
+    ::= { enterprises 9999 }
+
+-- Custom System Group
+customSystem OBJECT IDENTIFIER ::= { customEnterprise 1 }
+
+-- Custom System Information
+customSystemInfo OBJECT IDENTIFIER ::= { customSystem 1 }
+
+customTrap OBJECT-TYPE
+    SYNTAX OctetString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Custom trap OID for demonstration purposes"
+    ::= { customSystemInfo 1 }
+
+customSystemStatus OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Custom system status indicator (1=online, 0=offline)"
+    ::= { customSystemInfo 2 }
+
+customSystemLoad OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Custom system load percentage"
+    ::= { customSystemInfo 3 }
+
+customSystemMemory OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Custom system memory usage percentage"
+    ::= { customSystemInfo 4 }
+
+customSystemDisk OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Custom system disk usage percentage"
+    ::= { customSystemInfo 5 }
+
+-- Custom Network Group
+customNetwork OBJECT IDENTIFIER ::= { customSystem 2 }
+
+customNetworkInterfaces OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Number of custom network interfaces"
+    ::= { customNetwork 1 }
+
+customNetworkTraffic OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Custom network traffic counter"
+    ::= { customNetwork 2 }
+
+-- Custom Application Group
+customApplication OBJECT IDENTIFIER ::= { customSystem 3 }
+
+customApplicationStatus OBJECT-TYPE
+    SYNTAX Integer32
+    MAX-ACCESS read-write
+    STATUS current
+    DESCRIPTION
+        "Custom application status (1=running, 0=stopped)"
+    ::= { customApplication 1 }
+
+customApplicationVersion OBJECT-TYPE
+    SYNTAX DisplayString
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Custom application version string"
+    ::= { customApplication 2 }
+
+customApplicationUptime OBJECT-TYPE
+    SYNTAX TimeTicks
+    MAX-ACCESS read-only
+    STATUS current
+    DESCRIPTION
+        "Custom application uptime in hundredths of a second"
+    ::= { customApplication 3 }
+
+-- Custom Trap Definitions
+customTraps OBJECT IDENTIFIER ::= { customSystem 4 }
+
+customTrapNotification NOTIFICATION-TYPE
+    OBJECTS { customTrap, customSystemStatus }
+    STATUS current
+    DESCRIPTION
+        "Custom trap notification for system events"
+    ::= { customTraps 1 }
+
+customSystemDownTrap NOTIFICATION-TYPE
+    OBJECTS { customSystemStatus }
+    STATUS current
+    DESCRIPTION
+        "Trap sent when system goes down"
+    ::= { customTraps 2 }
+
+customSystemUpTrap NOTIFICATION-TYPE
+    OBJECTS { customSystemStatus }
+    STATUS current
+    DESCRIPTION
+        "Trap sent when system comes up"
+    ::= { customTraps 3 }
+
+customHighLoadTrap NOTIFICATION-TYPE
+    OBJECTS { customSystemLoad }
+    STATUS current
+    DESCRIPTION
+        "Trap sent when system load exceeds threshold"
+    ::= { customTraps 4 }
+
+customLowMemoryTrap NOTIFICATION-TYPE
+    OBJECTS { customSystemMemory }
+    STATUS current
+    DESCRIPTION
+        "Trap sent when system memory is low"
+    ::= { customTraps 5 }
+
+END

@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snmp-agent
+  namespace: snmp-system
+  labels:
+    app: snmp-agent
+    component: snmp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snmp-agent
+  template:
+    metadata:
+      labels:
+        app: snmp-agent
+        component: snmp
+    spec:
+      containers:
+      - name: snmp-agent
+        image: snmp-project/snmp-agent:latest
+        ports:
+        - containerPort: 161
+          protocol: UDP
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys; sys.exit(0)"
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys; sys.exit(0)"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: AGENT_ID
+          value: "agent-001"
+        - name: AGENT_PORT
+          value: "161"
+        - name: LOG_LEVEL
+          value: "info"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: mib
+          mountPath: /app/mib
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: mib
+        configMap:
+          name: snmp-mib-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: snmp-agent-service
+  namespace: snmp-system
+  labels:
+    app: snmp-agent
+spec:
+  selector:
+    app: snmp-agent
+  ports:
+  - port: 161
+    targetPort: 161
+    protocol: UDP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snmp-mib-config
+  namespace: snmp-system
+data:
+  custom-mib.txt: |
+    -- Custom SNMP MIB Definition
+    CUSTOM-ENTERPRISE-MIB DEFINITIONS ::= BEGIN
+    -- MIB content here
+    END

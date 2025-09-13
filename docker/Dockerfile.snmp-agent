@@ -1,0 +1,39 @@
+# Python SNMP Agent
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file
+COPY snmp-agent/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY snmp-agent/ .
+
+# Create logs directory
+RUN mkdir -p logs
+
+# Create non-root user
+RUN useradd -m -u 1001 snmpuser
+
+# Change ownership
+RUN chown -R snmpuser:snmpuser /app
+
+# Switch to non-root user
+USER snmpuser
+
+# Expose SNMP port
+EXPOSE 161/udp
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD python -c "import sys; sys.exit(0)" || exit 1
+
+CMD ["python", "snmp_agent.py"]

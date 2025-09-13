@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snmp-web-client
+  namespace: snmp-system
+  labels:
+    app: snmp-web-client
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: snmp-web-client
+  template:
+    metadata:
+      labels:
+        app: snmp-web-client
+        component: frontend
+    spec:
+      containers:
+      - name: web-client
+        image: snmp-project/web-client:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: REACT_APP_API_URL
+          value: "http://snmp-web-server-service:5000"
+        - name: REACT_APP_SOCKET_URL
+          value: "http://snmp-web-server-service:5000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: snmp-web-client-service
+  namespace: snmp-system
+  labels:
+    app: snmp-web-client
+spec:
+  selector:
+    app: snmp-web-client
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+  type: ClusterIP

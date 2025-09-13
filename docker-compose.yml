@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # Web Client (React)
+  web-client:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web-client
+    container_name: snmp-web-client
+    ports:
+      - "3000:80"
+    depends_on:
+      - web-server
+    networks:
+      - snmp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Web Server (Node.js API)
+  web-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web-server
+    container_name: snmp-web-server
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - CLIENT_URL=http://localhost:3000
+      - LOG_LEVEL=info
+    volumes:
+      - ./logs/web-server:/app/logs
+    depends_on:
+      - snmp-manager
+      - snmp-agent
+    networks:
+      - snmp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SNMP Manager (Python)
+  snmp-manager:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.snmp-manager
+    container_name: snmp-manager
+    ports:
+      - "8080:8080"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - WEB_SERVER_URL=http://web-server:5000
+    volumes:
+      - ./logs/snmp-manager:/app/logs
+    networks:
+      - snmp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # SNMP Agent (Python)
+  snmp-agent:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.snmp-agent
+    container_name: snmp-agent
+    ports:
+      - "161:161/udp"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - AGENT_ID=agent-001
+      - AGENT_PORT=161
+    volumes:
+      - ./logs/snmp-agent:/app/logs
+      - ./mib:/app/mib
+    networks:
+      - snmp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: snmp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - snmp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Load Balancer (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: snmp-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - web-client
+      - web-server
+    networks:
+      - snmp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  snmp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  redis-data:
+    driver: local
+
+# Development override
+# Use: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up

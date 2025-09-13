@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snmp-web-server
+  namespace: snmp-system
+  labels:
+    app: snmp-web-server
+    component: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: snmp-web-server
+  template:
+    metadata:
+      labels:
+        app: snmp-web-server
+        component: backend
+    spec:
+      containers:
+      - name: web-server
+        image: snmp-project/web-server:latest
+        ports:
+        - containerPort: 5000
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "5000"
+        - name: CLIENT_URL
+          value: "http://snmp-web-client-service"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: REDIS_URL
+          value: "redis://snmp-redis-service:6379"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: snmp-web-server-service
+  namespace: snmp-system
+  labels:
+    app: snmp-web-server
+spec:
+  selector:
+    app: snmp-web-server
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+  type: ClusterIP

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: snmp-system
+  labels:
+    name: snmp-system
+    app: snmp-management

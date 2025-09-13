@@ -1,0 +1,65 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: snmp-ingress
+  namespace: snmp-system
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  rules:
+  - host: snmp.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: snmp-web-client-service
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: snmp-web-server-service
+            port:
+              number: 5000
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: snmp-web-server-service
+            port:
+              number: 5000
+  - host: api.snmp.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: snmp-web-server-service
+            port:
+              number: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: snmp-ingress-service
+  namespace: snmp-system
+  labels:
+    app: snmp-ingress
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+  - port: 443
+    targetPort: 443
+    protocol: TCP
+  selector:
+    app: snmp-ingress
