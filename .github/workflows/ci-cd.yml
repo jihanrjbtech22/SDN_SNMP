@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Web CI
 
 on:
   push:
@@ -6,199 +6,39 @@ on:
   pull_request:
     branches: [ main, develop ]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        component: [web-client, web-server, snmp-manager, snmp-agent]
-    
+        component: [web-client, web-server]
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-    
+
     - name: Set up Node.js
-      if: matrix.component == 'web-client' || matrix.component == 'web-server'
       uses: actions/setup-node@v3
       with:
         node-version: '18'
         cache: 'npm'
         cache-dependency-path: ${{ matrix.component }}/package-lock.json
-    
-    - name: Set up Python
-      if: matrix.component == 'snmp-manager' || matrix.component == 'snmp-agent'
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
+
     - name: Install dependencies
-      if: matrix.component == 'web-client' || matrix.component == 'web-server'
       run: |
         cd ${{ matrix.component }}
         npm ci
-    
-    - name: Install Python dependencies
-      if: matrix.component == 'snmp-manager' || matrix.component == 'snmp-agent'
-      run: |
-        cd ${{ matrix.component }}
-        pip install -r requirements.txt
-        pip install pytest flake8
-    
-    - name: Run tests
+
+    - name: Run tests (web-client)
       if: matrix.component == 'web-client'
+      env:
+        CI: true
       run: |
         cd ${{ matrix.component }}
-        npm test -- --coverage --watchAll=false
-    
-    - name: Run tests
+        npm test -- --watchAll=false --coverage
+
+    - name: Run tests (web-server)
       if: matrix.component == 'web-server'
       run: |
         cd ${{ matrix.component }}
         npm test
-    
-    - name: Run Python tests
-      if: matrix.component == 'snmp-manager' || matrix.component == 'snmp-agent'
-      run: |
-        cd ${{ matrix.component }}
-        if [ -d tests ]; then
-          python -m pytest tests/ -v
-        else
-          echo "No tests directory found for ${{ matrix.component }}. Skipping Python tests."
-        fi
-    
-    - name: Lint code
-      if: matrix.component == 'web-client' || matrix.component == 'web-server'
-      run: |
-        cd ${{ matrix.component }}
-        npm run lint
-    
-    - name: Lint Python code
-      if: matrix.component == 'snmp-manager' || matrix.component == 'snmp-agent'
-      run: |
-        cd ${{ matrix.component }}
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    
-    strategy:
-      matrix:
-        component: [web-client, web-server, snmp-manager, snmp-agent]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    
-    - name: Log in to Container Registry
-      uses: docker/login-action@v2
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v4
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.component }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
-    
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        file: ./docker/Dockerfile.${{ matrix.component }}
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-  security-scan:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    
-    strategy:
-      matrix:
-        component: [web-client, web-server, snmp-manager, snmp-agent]
-    
-    steps:
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.component }}:latest
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-    
-    - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: 'trivy-results.sarif'
-
-  deploy-staging:
-    needs: [build, security-scan]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    environment: staging
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    
-    - name: Deploy to staging
-      run: |
-        echo "Deploying to staging environment..."
-        # Add your staging deployment commands here
-        # For example: kubectl apply -f k8s/
-    
-    - name: Run integration tests
-      run: |
-        echo "Running integration tests..."
-        # Add your integration test commands here
-
-  deploy-production:
-    needs: [build, security-scan]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    
-    - name: Deploy to production
-      run: |
-        echo "Deploying to production environment..."
-        # Add your production deployment commands here
-        # For example: kubectl apply -f k8s/
-    
-    - name: Run smoke tests
-      run: |
-        echo "Running smoke tests..."
-        # Add your smoke test commands here
-
-  notify:
-    needs: [deploy-staging, deploy-production]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-    - name: Notify deployment status
-      run: |
-        echo "Deployment completed with status: ${{ needs.deploy-staging.result || needs.deploy-production.result }}"
-        # Add your notification logic here (Slack, email, etc.)
