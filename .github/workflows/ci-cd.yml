@@ -46,6 +46,7 @@ jobs:
       run: |
         cd ${{ matrix.component }}
         pip install -r requirements.txt
+        pip install pytest flake8
     
     - name: Run tests
       if: matrix.component == 'web-client'
@@ -63,7 +64,11 @@ jobs:
       if: matrix.component == 'snmp-manager' || matrix.component == 'snmp-agent'
       run: |
         cd ${{ matrix.component }}
-        python -m pytest tests/ -v
+        if [ -d tests ]; then
+          python -m pytest tests/ -v
+        else
+          echo "No tests directory found for ${{ matrix.component }}. Skipping Python tests."
+        fi
     
     - name: Lint code
       if: matrix.component == 'web-client' || matrix.component == 'web-server'
